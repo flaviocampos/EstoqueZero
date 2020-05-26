@@ -55,33 +55,49 @@ public class ProdutoRepository {
                 .executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
     }
 
-    public void salva(Produto produto, DadosCarregadosListener<Produto> listener) {
+    public void salva(Produto produto, DadosCarregadosCallBack<Produto> callBack) {
+        salvaNaAPI(produto, callBack);
+    }
+
+    private void salvaNaAPI(Produto produto, DadosCarregadosCallBack<Produto> callBack) {
         final Call<Produto> call = service.salva(produto);
         call.enqueue(new Callback<Produto>() {
             @Override
             public void onResponse(Call<Produto> call, Response<Produto> response) {
-                final Produto produtoSalva = response.body();
-
-                new BaseAsyncTask<>(() -> {
-                    long id = dao.salva(produtoSalva);
-                    return dao.buscaProduto(id);
-                }, produtoSalvo ->
-                        listener.quandoCarregados(produtoSalvo)
-                )
-                        .execute();
+                if (response.isSuccessful()) {
+                    final Produto produtoSalvo = response.body();
+                    if (produtoSalvo != null)
+                        salvaInterno(produtoSalvo, callBack);
+                } else {
+                    callBack.quandoFalha("Nāo foi possível Salvar!");
+                }
             }
 
             @Override
             public void onFailure(Call<Produto> call, Throwable t) {
-
+                callBack.quandoFalha("Erro comunicaçāo: " + t.getMessage());
             }
         });
+    }
 
-
+    private void salvaInterno(Produto produto, DadosCarregadosCallBack<Produto> callBack) {
+        new BaseAsyncTask<>(() -> {
+            long id = dao.salva(produto);
+            return dao.buscaProduto(id);
+        }, produtoSalvo ->
+                callBack.quandoSucesso(produtoSalvo)
+        )
+                .execute();
     }
 
     public interface DadosCarregadosListener<T> {
         void quandoCarregados(T resultado);
+    }
+
+    public interface DadosCarregadosCallBack<T> {
+        void quandoSucesso(T resultado);
+
+        void quandoFalha(String erro);
     }
 
 }
