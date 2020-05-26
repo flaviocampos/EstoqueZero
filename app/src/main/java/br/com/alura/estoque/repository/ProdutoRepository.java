@@ -11,21 +11,24 @@ import br.com.alura.estoque.model.Produto;
 import br.com.alura.estoque.retrofit.EstoqueRetrofit;
 import br.com.alura.estoque.retrofit.ProdutoService;
 import retrofit2.Call;
+import retrofit2.Callback;
 import retrofit2.Response;
 
 public class ProdutoRepository {
 
     final private ProdutoDAO dao;
+    private final ProdutoService service;
 
     public ProdutoRepository(ProdutoDAO dao) {
         this.dao = dao;
+        service = new EstoqueRetrofit().getProdutoService();
     }
 
-    public void buscaProdutos(ProdutosCarregadosListener listener) {
+    public void buscaProdutos(DadosCarregadosListener<List<Produto>> listener) {
         buscaProdutosInternos(listener);
     }
 
-    private void buscaProdutosInternos(ProdutosCarregadosListener listener) {
+    private void buscaProdutosInternos(DadosCarregadosListener<List<Produto>> listener) {
         new BaseAsyncTask<>(dao::buscaTodos,
                 resultado -> {
                     listener.quandoCarregados(resultado);
@@ -33,8 +36,8 @@ public class ProdutoRepository {
                 }).execute();
     }
 
-    private void buscaProdutosNaAPI(ProdutosCarregadosListener listener) {
-        ProdutoService service = new EstoqueRetrofit().getProdutoService();
+    private void buscaProdutosNaAPI(DadosCarregadosListener<List<Produto>> listener) {
+
         Call<List<Produto>> call = service.buscarTodos();
 
         new BaseAsyncTask<>(() -> {
@@ -47,13 +50,38 @@ public class ProdutoRepository {
             }
             return dao.buscaTodos();
         }, produtosNovos ->
-               listener.quandoCarregados(produtosNovos)
+                listener.quandoCarregados(produtosNovos)
         )
                 .executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
     }
 
-    public interface ProdutosCarregadosListener{
-        void quandoCarregados(List<Produto> produtos);
+    public void salva(Produto produto, DadosCarregadosListener<Produto> listener) {
+        final Call<Produto> call = service.salva(produto);
+        call.enqueue(new Callback<Produto>() {
+            @Override
+            public void onResponse(Call<Produto> call, Response<Produto> response) {
+                final Produto produtoSalva = response.body();
+
+                new BaseAsyncTask<>(() -> {
+                    long id = dao.salva(produtoSalva);
+                    return dao.buscaProduto(id);
+                }, produtoSalvo ->
+                        listener.quandoCarregados(produtoSalvo)
+                )
+                        .execute();
+            }
+
+            @Override
+            public void onFailure(Call<Produto> call, Throwable t) {
+
+            }
+        });
+
+
+    }
+
+    public interface DadosCarregadosListener<T> {
+        void quandoCarregados(T resultado);
     }
 
 }
