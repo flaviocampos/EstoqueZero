@@ -11,6 +11,7 @@ import br.com.alura.estoque.model.Produto;
 import br.com.alura.estoque.retrofit.EstoqueRetrofit;
 import br.com.alura.estoque.retrofit.ProdutoService;
 import br.com.alura.estoque.retrofit.callback.BaseCallback;
+import br.com.alura.estoque.retrofit.callback.CallBackSemRetorno;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -114,6 +115,33 @@ public class ProdutoRepository {
         new BaseAsyncTask<>(() -> {
             dao.atualiza(produto);
             return produto;
+        }, callBack::quandoSucesso)
+                .execute();
+    }
+
+    public void remove(Produto produto, DadosCarregadosCallBack<Void> callBack) {
+        removeNaAPI(produto, callBack);
+    }
+
+    private void removeNaAPI(Produto produto, DadosCarregadosCallBack<Void> callBack) {
+        Call<Void> call = service.remove(produto.getId());
+        call.enqueue(new CallBackSemRetorno(new CallBackSemRetorno.RespostaCallback() {
+            @Override
+            public void quandoSucesso() {
+                removeInterno(produto, callBack);
+            }
+
+            @Override
+            public void quandoFalha(String erro) {
+                callBack.quandoFalha(erro);
+            }
+        }));
+    }
+
+    private void removeInterno(Produto produto, DadosCarregadosCallBack<Void> callBack) {
+        new BaseAsyncTask<>(() -> {
+            dao.remove(produto);
+            return null;
         }, callBack::quandoSucesso)
                 .execute();
     }
